@@ -1,6 +1,11 @@
 package org.example;
 
 import com.newrelic.api.agent.Trace;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.metrics.DoubleHistogram;
+import io.opentelemetry.api.metrics.LongCounter;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.Tracer;
@@ -14,29 +19,46 @@ public class Main {
     static Tracer tracer = sdk.getTracer("instrumentation-scope-name", "instrumentation-scope-version");
 
     public static void main(String[] args) throws InterruptedException {
-
         for (int i = 1; i <= 500000; i++) {
-
-            // no txn started on its own
-            noSpanKind();
-
-            // calls noSpanKind() but wraps it in a NR txn
-            nrTraceNoSpanKind();
-
-            // For client spans, we either turn it into a database span or an external based on the span attributes. No txn started on its own
-            clientSpanKind();
-            dbClientSpanKind();
-            externalClientSpanKind();
-
-            // calls clientSpanKind() but wraps it in a NR txn
-            nrTraceClientSpanKind();
-
-            // starts an OtherTransaction txn based on consumer span kind
-            consumerSpanKind();
-
-            // starts a WebTransaction/Uri txn based on server span kind
-            serverSpanKind();
+            createManualOtelSpans();
+            createOtelMetrics();
         }
+    }
+
+    public static void createOtelMetrics() {
+        LongCounter longCounter = GlobalOpenTelemetry.get().getMeterProvider().get("otel-api-test").counterBuilder("otel.api.test.counter").build();
+        longCounter.add(1, Attributes.of(AttributeKey.stringKey("foo"), "bar"));
+
+        DoubleHistogram doubleHistogram = GlobalOpenTelemetry.get().getMeterProvider().get("otel-api-test").histogramBuilder("otel.api.test.histogram").build();
+        doubleHistogram.record(1, Attributes.of(AttributeKey.stringKey("bar"), "baz"));
+    }
+
+    public static void createManualOtelSpans() throws InterruptedException {
+        // no txn started on its own
+        noSpanKind();
+
+        // calls noSpanKind() but wraps it in a NR txn
+        nrTraceNoSpanKind();
+
+        // For client spans, we either turn it into a database span or an external based on the span attributes. No txn started on its own
+        clientSpanKind();
+        dbClientSpanKind();
+        externalClientSpanKind();
+
+        // calls clientSpanKind() but wraps it in a NR txn
+        nrTraceClientSpanKind();
+
+        // starts an OtherTransaction txn based on consumer span kind
+        consumerSpanKind();
+
+        // TODO what should this do??? no txn started on its own
+        producerSpanKind();
+
+        // calls producerSpanKind() but wraps it in a NR txn
+        nrTraceProducerSpanKind();
+
+        // starts a WebTransaction/Uri txn based on server span kind
+        serverSpanKind();
     }
 
     @Trace(dispatcher = true)
@@ -56,6 +78,16 @@ public class Main {
             clientSpanKind();
             dbClientSpanKind();
             externalClientSpanKind();
+            Thread.sleep(500);
+        } catch (InterruptedException ignored) {
+        }
+    }
+
+    @Trace(dispatcher = true)
+    public static void nrTraceProducerSpanKind() {
+        System.out.println("called nrTraceProducerSpanKind");
+        try {
+            producerSpanKind();
             Thread.sleep(500);
         } catch (InterruptedException ignored) {
         }
@@ -89,10 +121,24 @@ public class Main {
         }
     }
 
+    // create generic producer span
+    public static void producerSpanKind() throws InterruptedException {
+        Span span = tracer.spanBuilder("producerSpanKind").setSpanKind(SpanKind.PRODUCER).startSpan();
+        try (Scope scope = span.makeCurrent()) {
+            System.out.println("called producerSpanKind");
+            Thread.sleep(1000);
+        } catch (Throwable t) {
+            span.recordException(t);
+            throw t;
+        } finally {
+            span.end();
+        }
+    }
+
     // create generic server span
     public static void serverSpanKind() throws InterruptedException {
         Span span = tracer.spanBuilder("serverSpanKind").setSpanKind(SpanKind.SERVER)
-                /*.setAttribute("url.path", "/whatever") */
+                .setAttribute("url.path", "/whatever")
                 .startSpan();
         try (Scope scope = span.makeCurrent()) {
             System.out.println("called serverSpanKind");
