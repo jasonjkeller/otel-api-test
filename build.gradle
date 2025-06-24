@@ -1,5 +1,16 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath 'com.gradleup.shadow:shadow-gradle-plugin:9.0.0-beta17'
+    }
+}
+
 plugins {
     id 'java'
+    id 'com.gradleup.shadow' version "9.0.0-beta17"
 }
 
 group = 'org.example'
@@ -10,19 +21,21 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.newrelic.agent.java:newrelic-api:8.16.0'
+    implementation 'com.newrelic.agent.java:newrelic-api:8.21.0'
 
-    implementation(platform("io.opentelemetry:opentelemetry-bom:1.44.1"))
+    implementation(platform("io.opentelemetry:opentelemetry-bom:1.51.0"))
     implementation("io.opentelemetry:opentelemetry-sdk-extension-autoconfigure")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp")
-//    implementation("io.opentelemetry:opentelemetry-api")
-//    implementation("io.opentelemetry:opentelemetry-sdk")
-//    implementation("io.opentelemetry:opentelemetry-exporter-logging")
-//    implementation("io.opentelemetry.semconv:opentelemetry-semconv:1.25.0-alpha")
-
+    implementation("io.opentelemetry:opentelemetry-api")
 
     testImplementation platform('org.junit:junit-bom:5.9.1')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'org.example.Main'
+    }
 }
 
 test {

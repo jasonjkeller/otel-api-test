@@ -14,6 +14,7 @@ import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk;
 
 public class Main {
+    // Autoconfigure the OTel SDK
     static OpenTelemetrySdk sdk = AutoConfiguredOpenTelemetrySdk.initialize()
             .getOpenTelemetrySdk();
     static Tracer tracer = sdk.getTracer("instrumentation-scope-name", "instrumentation-scope-version");
@@ -25,6 +26,9 @@ public class Main {
         }
     }
 
+    /**
+     * Generates OpenTelemetry dimensional metrics
+     */
     public static void createOtelMetrics() {
         LongCounter longCounter = GlobalOpenTelemetry.get().getMeterProvider().get("otel-api-test").counterBuilder("otel.api.test.counter").build();
         longCounter.add(1, Attributes.of(AttributeKey.stringKey("foo"), "bar"));
@@ -33,6 +37,12 @@ public class Main {
         doubleHistogram.record(1, Attributes.of(AttributeKey.stringKey("bar"), "baz"));
     }
 
+    /**
+     * Generates OpenTelemetry spans.
+     * <p>
+     * Depending on the SpanKind, and whether a New Relic transaction is present, different outcomes
+     * can be expected as far as how the New Relic Java agent handles the OpenTelemetry spans.
+     */
     public static void createManualOtelSpans() throws InterruptedException {
         // no txn started on its own
         noSpanKind();
@@ -51,7 +61,7 @@ public class Main {
         // starts an OtherTransaction txn based on consumer span kind
         consumerSpanKind();
 
-        // TODO what should this do??? no txn started on its own
+        // no txn started on its own
         producerSpanKind();
 
         // calls producerSpanKind() but wraps it in a NR txn
